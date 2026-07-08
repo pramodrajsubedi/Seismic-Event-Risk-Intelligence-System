@@ -1,0 +1,36 @@
+# Database (rebuilt automatically on cloud from USGS API)
+data/seismic.db
+data/*.db
+
+# Model artifacts — commit these to GitHub so cloud deploy skips retraining
+# models/model.pkl
+# models/scaler.pkl
+# models/feature_names.pkl
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Jupyter
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+# Environment
+.env
+.venv
+venv/
+env/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Streamlit
+.streamlit/secrets.toml
+notebooks/correlation_heatmap.png
