@@ -4,7 +4,7 @@ An end-to-end data science pipeline that ingests live earthquake data from the U
 validates physical laws through EDA, and predicts damaging aftershock probability
 using an XGBoost classifier — deployed as an interactive Streamlit dashboard.
 
-**[Live Demo →](https://your-app-name.streamlit.app)**
+**[Live Demo →](https://seismic-event-risk-intelligence-system.streamlit.app/)**
 
 ---
 
