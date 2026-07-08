@@ -37,11 +37,11 @@ Four interactive charts from the SQLite database: Gutenberg-Richter validation, 
 
 ## Key findings
 
-- **b-value ≈ 1.0** in the Gutenberg-Richter analysis — confirming the dataset is physically consistent with the global average
+- **b-value ≈ 1.0** in the Gutenberg-Richter analysis, confirming the dataset is physically consistent with the global average
 - **Magnitude (r = 0.61)** is the strongest predictor of damaging aftershocks, matching Bath's Law which states the largest aftershock is ~1.2 magnitude units below the mainshock
 - **Subduction zones** generated 100% damaging aftershock rate across 72 M5+ mainshocks
-- **Shallow events** (depth < 70 km) account for all tsunami-flagged earthquakes — confirmed by SQL depth analysis
-- **M7.8 Philippines** (June 2026): 232 aftershocks within 200 km, 179 damaging — Omori-Utsu decay curve visible in the data
+- **Shallow events** (depth < 70 km) account for all tsunami-flagged earthquakes, confirmed by SQL depth analysis
+- **M7.8 Philippines** (June 2026): 232 aftershocks within 200 km, 179 damaging, Omori-Utsu decay curve visible in the data
 
 ---
 
@@ -91,7 +91,7 @@ tsunami_flag
 
 ## SQL highlights
 
-**Gutenberg-Richter law** — verifies the log-linear magnitude-frequency relationship:
+**Gutenberg-Richter law** (verifies the log-linear magnitude-frequency relationship):
 ```sql
 SELECT ROUND(magnitude, 1) AS mag_bin,
        COUNT(*)             AS event_count,
@@ -101,7 +101,7 @@ GROUP  BY mag_bin
 ORDER  BY mag_bin DESC;
 ```
 
-**Monthly seismic energy release** — Richter-Gutenberg formula embedded in SQL:
+**Monthly seismic energy release** (Richter-Gutenberg formula embedded in SQL):
 ```sql
 SELECT strftime('%Y-%m', event_time) AS month,
        ROUND(SUM(POWER(10.0, 1.5 * magnitude + 4.8)) / 1e15, 4) AS energy_PJ,
@@ -126,7 +126,7 @@ GROUP  BY month;
 | Interpretability | SHAP beeswarm plot |
 
 **Feature importance (SHAP):**
-Magnitude is the dominant feature — consistent with Bath's Law. Depth and tectonic setting provide additional signal, particularly for distinguishing subduction zone sequences from intraplate events.
+Magnitude is the dominant feature, consistent with Bath's Law. Depth and tectonic setting provide additional signal, particularly for distinguishing subduction zone sequences from intraplate events.
 
 ---
 
