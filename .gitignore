@@ -34,3 +34,7 @@ Thumbs.db
 # Streamlit
 .streamlit/secrets.toml
 notebooks/correlation_heatmap.png
+
+models/metrics.json
+models/pr_curve.png
+models/roc_curve.png
