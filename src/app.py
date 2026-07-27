@@ -872,7 +872,7 @@ with tab4:
 
                 st.write("**Results** — `top_driver` shows the key factor per row")
                 st.dataframe(
-                    out_df.style.applymap(colour_risk, subset=["risk_level"]),
+                    out_df.style.map(colour_risk, subset=["risk_level"]),
                     use_container_width=True, hide_index=True)
 
                 # Distribution chart
