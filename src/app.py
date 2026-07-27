@@ -168,10 +168,10 @@ with st.sidebar:
             xaxis=dict(visible=False), yaxis=dict(visible=False),
             plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
         st.caption("Hourly M4+ activity (last 24h)")
-        st.plotly_chart(fig_spark, use_container_width=True)
+        st.plotly_chart(fig_spark, width = 'stretch')
 
         st.divider()
-        if st.button("🔄 Refresh all data", use_container_width=True):
+        if st.button("🔄 Refresh all data", width = 'stretch'):
             st.cache_data.clear()
             st.rerun()
 
@@ -183,7 +183,7 @@ with st.sidebar:
                 st.markdown(f"🔴 **M{row['magnitude']:.1f}** — {str(row['place'])[:28]}")
     else:
         st.warning("USGS API unreachable")
-        if st.button("🔄 Retry", use_container_width=True):
+        if st.button("🔄 Retry", width = 'stretch'):
             st.cache_data.clear()
             st.rerun()
 
@@ -246,7 +246,7 @@ with tab1:
                      showocean=True,oceancolor="#dbeafe",
                      showcountries=True,countrycolor="#cbd5e1"),
             margin=dict(l=0,r=0,t=10,b=0))
-        st.plotly_chart(fig_map, use_container_width=True)
+        st.plotly_chart(fig_map, width = 'stretch')
 
         sig = live_df[live_df["magnitude"]>=5.5].sort_values(
             "magnitude",ascending=False).head(10)
@@ -254,7 +254,7 @@ with tab1:
             st.write("**M5.5+ events**")
             st.dataframe(sig[["time","place","magnitude","depth_km","tsunami","alert"]
                             ].reset_index(drop=True),
-                         use_container_width=True, hide_index=True)
+                         width = 'stretch', hide_index=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════════
@@ -284,14 +284,16 @@ with tab2:
                             "magnitude":p.get("mag",6.0),"depth_km":c[2],
                             "latitude":c[1],"longitude":c[0]})
             return out
-        except: return []
+        except: 
+            return []
 
     recent = fetch_recent()
 
     DEFS = {"magnitude":6.5,"depth_km":35.0,"latitude":5.6,"longitude":125.0,
             "tectonic":"Subduction zone","plate":"Convergent","risk_tier":4,"tsunami":False}
     for k,v in DEFS.items():
-        if k not in st.session_state: st.session_state[k] = v
+        if k not in st.session_state: 
+            st.session_state[k] = v
 
     if recent:
         opts = ["— manual entry —"] + [e["label"] for e in recent]
@@ -308,7 +310,9 @@ with tab2:
                 "tsunami":bool(ev["depth_km"]<100 and ev["magnitude"]>=6.5)})
 
     st.write("")
-    col_in, col_out = st.columns([1,1], gap="large")
+    
+    # ── ROW 1: Two columns for Inputs (a) and Risk/SHAP (b) ──
+    col_in, col_out = st.columns([1, 1], gap="large")
 
     with col_in:
         st.write("**Earthquake parameters**")
@@ -323,13 +327,17 @@ with tab2:
         rt   = st.selectbox("Region risk tier (1=low 4=high)", [1,2,3,4],
                              index=[1,2,3,4].index(st.session_state["risk_tier"]))
         tsun = st.checkbox("Tsunami potential", value=bool(st.session_state["tsunami"]))
+        
         predict_btn = st.button("⚡ Predict Aftershock Risk",
-                                use_container_width=True, type="primary")
+                                width = 'stretch', type="primary")
+        
+        if predict_btn:
+            st.session_state["prediction_made"] = True
 
     with col_out:
         st.write("**Risk assessment**")
-        if predict_btn:
-            X    = build_row(mag,dep,lat,lon,tect,plt_,rt,tsun)
+        if st.session_state.get("prediction_made", False):
+            X    = build_row(mag, dep, lat, lon, tect, plt_, rt, tsun)
             X_sc = scaler.transform(X)
             prob = float(model.predict_proba(X_sc)[0][1])
 
@@ -357,7 +365,7 @@ with tab2:
                                  "thickness":0.75,"value":prob*100}},
                 number={"suffix":"%","font":{"size":34}}))
             fig_g.update_layout(height=240,margin=dict(t=40,b=0,l=20,r=20))
-            st.plotly_chart(fig_g, use_container_width=True)
+            st.plotly_chart(fig_g, width = 'stretch')
 
             # Live SHAP
             sv = explainer.shap_values(X_sc)[0]
@@ -384,51 +392,7 @@ with tab2:
                 title="SHAP — why this score?  (red=raises risk · blue=lowers risk)",
                 xaxis_title="SHAP value", height=360, template="plotly_white",
                 margin=dict(t=50,b=30,l=10,r=90), font=dict(size=11))
-            st.plotly_chart(fig_s, use_container_width=True)
-
-            # Similar historical events
-            st.write("**Similar historical events — what actually happened?**")
-            try:
-                conn_sim = get_connection()
-                sim = pd.read_sql_query(f"""
-                    SELECT e.magnitude, e.depth_km, e.place, e.event_time,
-                           COALESCE(seq.had_damaging,0)      AS actual_outcome,
-                           COALESCE(seq.aftershock_count,0)  AS aftershock_count,
-                           ABS(e.magnitude - {mag}) +
-                           ABS(e.depth_km  - {dep}) / 100.0  AS similarity_score
-                    FROM   earthquakes e
-                    LEFT JOIN (
-                        SELECT mainshock_id,
-                               MAX(had_damaging_after) AS had_damaging,
-                               COUNT(*)                AS aftershock_count
-                        FROM   aftershock_sequences
-                        GROUP  BY mainshock_id
-                    ) seq ON seq.mainshock_id = e.quake_id
-                    WHERE  e.magnitude >= 5.0
-                    ORDER  BY similarity_score ASC
-                    LIMIT  5
-                """, conn_sim)
-                conn_sim.close()
-
-                if not sim.empty:
-                    sim["outcome"] = sim["actual_outcome"].apply(
-                        lambda v: "🔴 Damaging aftershock" if v==1 else "🟢 No damage")
-                    sim["event_time"] = sim["event_time"].astype(str).str[:10]
-                    st.dataframe(
-                        sim[["magnitude","depth_km","place","event_time",
-                             "aftershock_count","outcome"]].rename(columns={
-                            "magnitude":"M","depth_km":"Depth km",
-                            "place":"Location","event_time":"Date",
-                            "aftershock_count":"Aftershocks",
-                            "outcome":"Actual outcome"}),
-                        use_container_width=True, hide_index=True)
-                    pct = sim["actual_outcome"].mean()*100
-                    st.caption(f"Among the 5 most similar events, "
-                               f"{pct:.0f}% produced a damaging aftershock — "
-                               f"model predicted {prob*100:.0f}%.")
-            except Exception as e:
-                st.caption(f"Could not load similar events: {e}")
-
+            st.plotly_chart(fig_s, width = 'stretch')
         else:
             st.info("Set parameters and click **Predict**.")
             sp = MODELS_DIR/"shap_beeswarm.png"
@@ -436,8 +400,51 @@ with tab2:
                 st.write("**Overall feature importance (training data)**")
                 st.image(str(sp), caption="Mean |SHAP| across all training mainshocks")
 
-    # Sensitivity sweep — shown after prediction
-    if predict_btn:
+    # ── ROW 2: Full Width Section (c) ──
+    if st.session_state.get("prediction_made", False):
+        st.write("**Similar historical events — what actually happened?**")
+        try:
+            conn_sim = get_connection()
+            sim = pd.read_sql_query(f"""
+                SELECT e.magnitude, e.depth_km, e.place, e.event_time,
+                       COALESCE(seq.had_damaging,0)      AS actual_outcome,
+                       COALESCE(seq.aftershock_count,0)  AS aftershock_count,
+                       ABS(e.magnitude - {mag}) +
+                       ABS(e.depth_km  - {dep}) / 100.0  AS similarity_score
+                FROM   earthquakes e
+                LEFT JOIN (
+                    SELECT mainshock_id,
+                           MAX(had_damaging_after) AS had_damaging,
+                           COUNT(*)                AS aftershock_count
+                    FROM   aftershock_sequences
+                    GROUP  BY mainshock_id
+                ) seq ON seq.mainshock_id = e.quake_id
+                WHERE  e.magnitude >= 5.0
+                ORDER  BY similarity_score ASC
+                LIMIT  5
+            """, conn_sim)
+            conn_sim.close()
+
+            if not sim.empty:
+                sim["outcome"] = sim["actual_outcome"].apply(
+                    lambda v: "🔴 Damaging aftershock" if v==1 else "🟢 No damage")
+                sim["event_time"] = sim["event_time"].astype(str).str[:10]
+                st.dataframe(
+                    sim[["magnitude","depth_km","place","event_time",
+                         "aftershock_count","outcome"]].rename(columns={
+                        "magnitude":"M","depth_km":"Depth km",
+                        "place":"Location","event_time":"Date",
+                        "aftershock_count":"Aftershocks",
+                        "outcome":"Actual outcome"}),
+                    width = 'stretch', hide_index=True)
+                pct = sim["actual_outcome"].mean()*100
+                st.caption(f"Among the 5 most similar events, "
+                           f"{pct:.0f}% produced a damaging aftershock — "
+                           f"model predicted {prob*100:.0f}%.")
+        except Exception as e:
+            st.caption(f"Could not load similar events: {e}")
+
+        # ── ROW 3: Full Width Section (d) ──
         st.divider()
         st.write("### What-if Sensitivity Analysis")
         sweep_choice = st.selectbox("Sweep parameter",
@@ -446,15 +453,15 @@ with tab2:
 
         if sweep_choice == "Magnitude (M5→M9)":
             xs    = np.arange(5.0, 9.1, 0.1)
-            ys    = [predict_prob(m,dep,lat,lon,tect,plt_,rt,tsun) for m in xs]
+            ys    = [predict_prob(m, dep, lat, lon, tect, plt_, rt, tsun) for m in xs]
             cur_x, xlabel, cur_lbl = mag, "Magnitude", f"Current M{mag}"
         elif sweep_choice == "Depth (0→700 km)":
             xs    = np.arange(0, 701, 10)
-            ys    = [predict_prob(mag,d,lat,lon,tect,plt_,rt,tsun) for d in xs]
+            ys    = [predict_prob(mag, d, lat, lon, tect, plt_, rt, tsun) for d in xs]
             cur_x, xlabel, cur_lbl = dep, "Depth (km)", f"Current {dep:.0f} km"
         else:
-            xs    = [1,2,3,4]
-            ys    = [predict_prob(mag,dep,lat,lon,tect,plt_,t,tsun) for t in xs]
+            xs    = [1, 2, 3, 4]
+            ys    = [predict_prob(mag, dep, lat, lon, tect, plt_, t, tsun) for t in xs]
             cur_x, xlabel, cur_lbl = rt, "Risk tier", f"Current tier {rt}"
 
         fig_sw = go.Figure()
@@ -475,8 +482,7 @@ with tab2:
             yaxis=dict(range=[0,105]), height=340,
             template="plotly_white",
             margin=dict(t=45,b=40,l=55,r=20))
-        st.plotly_chart(fig_sw, use_container_width=True)
-
+        st.plotly_chart(fig_sw, width = 'stretch')
 
 # ══════════════════════════════════════════════════════════════════════════════════
 # TAB 3 — HISTORICAL ANALYSIS
@@ -486,7 +492,7 @@ with tab3:
 
     rc1, _ = st.columns([1,4])
     with rc1:
-        if st.button("🔄 Refresh analytics", use_container_width=True):
+        if st.button("🔄 Refresh analytics", width = 'stretch'):
             st.cache_data.clear()
             st.rerun()
 
@@ -577,7 +583,7 @@ with tab3:
             xaxis_title="Magnitude",yaxis_title="log₁₀(count)",height=340,
             template="plotly_white",margin=dict(t=45,b=40,l=45,r=20),
             legend=dict(orientation="h",y=1.12))
-        st.plotly_chart(f1, use_container_width=True)
+        st.plotly_chart(f1, width = 'stretch')
         st.caption("A straight line confirms data quality and G-R consistency.")
 
     with r1b:
@@ -590,7 +596,7 @@ with tab3:
             margin=dict(t=45,b=40,l=10,r=20),
             legend=dict(orientation="h",y=-0.28,font=dict(size=10)),
             yaxis=dict(autorange="reversed"))
-        st.plotly_chart(f2, use_container_width=True)
+        st.plotly_chart(f2, width = 'stretch')
         st.caption("Indonesia and the Philippines show the highest activity, consistent with their location along the Ring of Fire.")
 
     # Row 2
@@ -602,7 +608,7 @@ with tab3:
         f3.update_layout(title="Monthly Seismic Energy Release  [E=10^(1.5M+4.8)]",
             xaxis_title="Month",yaxis_title="Energy (PJ)",height=320,
             template="plotly_white",margin=dict(t=45,b=60,l=55,r=20))
-        st.plotly_chart(f3, use_container_width=True)
+        st.plotly_chart(f3, width = 'stretch')
         st.caption("One M7+ event can exceed the cumulative energy of all other months.")
 
     with r2b:
@@ -618,7 +624,7 @@ with tab3:
             f4.update_traces(texttemplate="%{text}%",textposition="outside")
             f4.update_layout(template="plotly_white",showlegend=False,
                 yaxis=dict(range=[0,115]),margin=dict(t=45,b=40,l=55,r=20))
-            st.plotly_chart(f4, use_container_width=True)
+            st.plotly_chart(f4, width = 'stretch')
             st.caption("Near-certain probabilities for M7+ events align with Bath's Law.")
         else:
             msg = ("Click **🔄 Refresh analytics** above."
@@ -643,7 +649,7 @@ with tab3:
             template="plotly_white",
             legend=dict(orientation="h",y=1.1),
             margin=dict(t=50,b=40,l=55,r=20))
-        st.plotly_chart(fig_d, use_container_width=True)
+        st.plotly_chart(fig_d, width = 'stretch')
         st.caption("Spikes above the rolling average indicate aftershock sequences "
                    "or swarm activity following a significant mainshock.")
 
@@ -713,7 +719,7 @@ with tab3:
                     template="plotly_white",
                     legend=dict(orientation="h",y=1.12),
                     margin=dict(t=50,b=50,l=55,r=20))
-                st.plotly_chart(fo, use_container_width=True)
+                st.plotly_chart(fo, width = 'stretch')
                 st.caption("A steep initial decay followed by gradual flattening, reflecting the characteristic Omori-Utsu pattern.")
 
         with map_col:
@@ -752,7 +758,7 @@ with tab3:
                              projection_scale=8),
                     legend=dict(orientation="h",y=-0.12,font=dict(size=10)),
                     margin=dict(l=0,r=0,t=45,b=0))
-                st.plotly_chart(fig_seq, use_container_width=True)
+                st.plotly_chart(fig_seq, width = 'stretch')
                 st.caption("Colour shows time elapsed since mainshock. "
                            "Aftershocks cluster within 1–2 fault lengths of the rupture zone.")
 
@@ -771,7 +777,7 @@ with tab3:
     f5.update_layout(template="plotly_white",
         legend=dict(orientation="h",y=1.08,font=dict(size=11)),
         margin=dict(t=10,b=50,l=55,r=20))
-    st.plotly_chart(f5, use_container_width=True)
+    st.plotly_chart(f5, width = 'stretch')
 
 
 # ══════════════════════════════════════════════════════════════════════════════════
@@ -818,9 +824,9 @@ with tab4:
 
     if raw_df is not None and not raw_df.empty:
         st.write(f"**{len(raw_df)} earthquakes loaded**")
-        st.dataframe(raw_df, use_container_width=True, hide_index=True)
+        st.dataframe(raw_df, width = 'stretch', hide_index=True)
 
-        if st.button("⚡ Score all", type="primary", use_container_width=True):
+        if st.button("⚡ Score all", type="primary", width = 'stretch'):
             required = ["magnitude","depth_km","latitude","longitude",
                         "tectonic_setting","plate_boundary_type",
                         "risk_tier","tsunami_flag"]
@@ -873,7 +879,7 @@ with tab4:
                 st.write("**Results** — `top_driver` shows the key factor per row")
                 st.dataframe(
                     out_df.style.map(colour_risk, subset=["risk_level"]),
-                    use_container_width=True, hide_index=True)
+                    width = 'stretch', hide_index=True)
 
                 # Distribution chart
                 rc = (pd.DataFrame(results)["risk_level"]
@@ -895,12 +901,12 @@ with tab4:
                 fb.update_layout(showlegend=False, template="plotly_white",
                     yaxis=dict(range=[0,len(raw_df)+1]),
                     margin=dict(t=45,b=40,l=40,r=20))
-                st.plotly_chart(fb, use_container_width=True)
+                st.plotly_chart(fb, width = 'stretch')
 
                 st.download_button("⬇️ Download results CSV",
                     data=out_df.to_csv(index=False),
                     file_name="seismic_risk_scores.csv",
-                    mime="text/csv", use_container_width=True)
+                    mime="text/csv", width = 'stretch')
     else:
         if mode == "📋 Paste CSV":
             st.write("**Expected format:**")
