@@ -84,7 +84,7 @@ def engineer_features(df: pd.DataFrame):
         "magnitude","depth_km","is_shallow","is_intermediate","mag_class",
         "risk_tier","tectonic_enc","plate_enc","latitude","longitude","tsunami_flag",
     ]
-    return df, feat_cols
+    return df, feat_cols, le_tect, le_plate
 
 
 # ── 3. Train + full metrics ───────────────────────────────────────────────────────
@@ -251,6 +251,8 @@ def save_artifacts(results):
     with open(MODELS_DIR/"model.pkl",         "wb") as f: pickle.dump(results["model"],     f)
     with open(MODELS_DIR/"scaler.pkl",        "wb") as f: pickle.dump(results["scaler"],    f)
     with open(MODELS_DIR/"feature_names.pkl", "wb") as f: pickle.dump(results["feat_cols"], f)
+    with open(MODELS_DIR/"le_tectonic.pkl", "wb") as f: pickle.dump(results["le_tect"], f)
+    with open(MODELS_DIR/"le_plate.pkl",    "wb") as f: pickle.dump(results["le_plate"], f)
     with open(MODELS_DIR/"metrics.json",      "w")  as f: json.dump(results["metrics"], f, indent=2)
     print(f"\n✓ Artifacts saved to: {MODELS_DIR}")
     print(f"  model.pkl  |  scaler.pkl  |  feature_names.pkl  |  metrics.json")
@@ -261,8 +263,8 @@ def save_artifacts(results):
 if __name__ == "__main__":
     print("Loading training data...")
     df = load_training_data()
-    df, feat_cols = engineer_features(df)
+    df, feat_cols, le_tect, le_plate = engineer_features(df)
     results = train(df, feat_cols)
     compute_shap(results["model"], results["X_scaled"], feat_cols)
-    save_artifacts(results)
+    save_artifacts({**results, "le_tect": le_tect, "le_plate": le_plate})
     print("\n✓ Done. Run: streamlit run src/app.py")
