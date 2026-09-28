@@ -16,7 +16,7 @@ def test_predict_returns_valid_schema():
         "longitude": 85.3,
         "tsunami_flag": 0,
         "risk_tier": 2,
-        "tectonic_setting": "Subduction Zone",
+        "tectonic_setting": "Subduction zone",
         "plate_boundary_type": "Convergent"
     }
     r = client.post("/predict", json=payload)
